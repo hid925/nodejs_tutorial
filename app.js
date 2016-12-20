@@ -23,7 +23,7 @@ app.post('/form_receiver', function(req,res){
 })
 
 app.get('/form',function(req,res){
-  res.render('form');
+  res.render('form',{topics:files});
 
 })
 
