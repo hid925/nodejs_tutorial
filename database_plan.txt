@@ -1,0 +1,11 @@
+get('topic/') : view.jade                   //토픽으로 접속시 뷰
+get('topic/:id') : view.jade                //토픽에 아이디 접속시 뷰
+get('topic/add') : add.jade                 //토픽 에드 접속시 에드 보여줌
+  post('topic/add')                         //내용 전송시 포스트로 에드에 전송
+  get('topic/:id')                          //전송 된 후 리다이렉션
+get('topic/:id/edit') : edit.jade           //사용자가 에디트 접속시 에디트 보여줌
+  post('topic/:id/edit')                    //에디트에서 수정된거 전송 포스트로
+  get('topic/:id')                          //전송 된 후 리다이렉션
+get('topic/:id/delete') : delete.jade       //사용자가 딜리트 할때 딜릿 보여줌
+  post('topic/:id/delete')                  //딜리트
+  get('topic/')                             //홈으로 리다이렉션

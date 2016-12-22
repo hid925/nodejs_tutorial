@@ -1,0 +1,22 @@
+doctype html
+html
+  head
+    meta(charset='utf-8')
+  body
+      h1
+        a(href='/topic') Server Side JavaScript
+      ul
+        each topic in topics
+          li
+            - rid = encodeURIComponent(topic['@rid']) //오리엔트디비 특문때문에 처리
+            a(href='/topic/'+rid)= topic.title
+      article
+        if topic
+          h2= topic.title
+          = topic.description
+          div= 'by '+topic.author
+        else
+          h2 Welcome
+          | This is server side javascript tutorial
+      div
+        a(href='/topic/add') add
