@@ -2,12 +2,31 @@ var express = require('express'); //express제어
 var app = express(); //express 객체 가져옴
 var bodyParser = require('body-parser'); //body parser가져옴
 var fs = require('fs'); //fs 가져옴
+var multer = require('multer');
+var _storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/');
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.originalname);
+  }
+});
+var upload = multer({ storage: _storage});
 
 app.locals.pretty = true;
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use('/user', express.static('uploads'));
 
 app.set('views','./views_file');  //뷰스 경로
 app.set('view engine', 'jade'); // 제이드 셋팅
+
+app.get('/upload',function(req, res){
+  res.render('upload');
+});
+app.post('/upload', upload.single('userfile'), function(req, res){
+  //console.log(req.file);
+  res.send('Uploaded : ' +  req.file.filename);
+});
 
 app.get('/topic/new', function(req, res) {
   fs.readdir('data', function(err, files) { //경로에 있는 파일을 읽어서
