@@ -18,5 +18,12 @@ html
         else
           h2 Welcome
           | This is server side javascript tutorial
-      div
-        a(href='/topic/add') add
+      ul
+        li
+          a(href='/topic/add') add
+        if topic
+          - rid = encodeURIComponent(topic['@rid'])
+            li
+              a(href='/topic/'+rid+'/edit') edit
+            li
+              a(href='/topic/'+rid+'/delete') delete
