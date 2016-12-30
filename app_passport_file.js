@@ -6,6 +6,7 @@ var bkfd2Password = require("pbkdf2-password");
 var hasher = bkfd2Password();
 var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
+var FacebookStrategy = require('passport-facebook').Strategy;
 
 var app = express();
 
@@ -40,6 +41,7 @@ app.get('/welcome',function(req,res) {
   if(req.user && req.user.displayName){
     res.send(`
         <h1>Hello, ${req.user.displayName}</h1>
+        ${req.user.email}<br>
         <a href="/auth/logout">logout</a>
       `);
   } else {
@@ -55,6 +57,7 @@ app.get('/welcome',function(req,res) {
 
 var users=[
   {
+    authId:'local:egoing',
     username:'egoing',
     password:'LjQjQdd+mx9KecsaPA9lqiX8tckdmltPnrU2K/9EmJqzr+m/nsZNiKa4af2VvttohlZUpzvdKuuAyarXfvsHZm9CTMzZeeTiVJ0XSAPnTkN9uRiLcSq+4AodT3ZVpqH80XzH3RczjAgTMVss+R2Beo7I0Pp4bVGH7rpgXUzaohE=',
     displayName:'Egoing',
@@ -65,6 +68,7 @@ var users=[
 app.post('/auth/register',function(req,res){
   hasher({password:req.body.password},function(err, pass, salt, hash){
     var user={
+      authId:'local:'+req.body.username,
       username:req.body.username,
       password:hash,
       salt:salt,
@@ -103,17 +107,18 @@ app.get('/auth/register', function(req,res) {
 
 passport.serializeUser(function(user, done) {
   console.log('serializeUser',user);
-  done(null, user.username);
+  done(null, user.authId);
 });
 
 passport.deserializeUser(function(id, done) {
   console.log('deserializeUser',id);
   for(var i=0; i<users.length; i++){
     var user = users[i];
-    if(user.username === id){
-      done(null, user);
+    if(user.authId === id){
+      return done(null, user);
     }
   }
+  done('There is no user.');
 });
 
 passport.use(new LocalStrategy(
@@ -138,7 +143,37 @@ passport.use(new LocalStrategy(
     }
 ));
 
-app.post('/auth/login',
+passport.use(new FacebookStrategy({
+    clientID: '198484513948718',
+    clientSecret: '07b4fc5d416565845111266d5e5a9a49',
+    callbackURL: "/auth/facebook/callback",
+    profileFields:['id','email', 'gender', 'link', 'locale','name',
+    'timezone', 'verified', 'displayName']
+  },
+  function(accessToken, refreshToken, profile, done) {
+    console.log(profile);
+    var authId='facebook:'+profile.id;
+    for(var i=0; i<users.length; i++){
+      var user = users[i];
+      if(user.authId === authId){
+        return done(null, user);
+      }
+    }
+    var newuser={
+      'authId':authId,
+      'displayName':profile.displayName,
+      'email':profile.emails[0].value
+    };
+    users.push(newuser);
+    done(null, newuser);
+  //  User.findOrCreate(..., function(err, user) {
+  //    if (err) { return done(err); }
+  //    done(null, user);
+  //  });
+  }
+));
+
+app.post('/auth/login',     //로컬 로그인.
   passport.authenticate('local',
     {
       successRedirect: '/welcome',
@@ -148,6 +183,23 @@ app.post('/auth/login',
   )
 );
 
+app.get('/auth/facebook',   //페북 로그인
+  passport.authenticate(
+    'facebook',{
+      scope: 'email'
+    }
+  )
+);
+
+app.get('/auth/facebook/callback',
+  passport.authenticate(
+    'facebook',
+    {
+      successRedirect: '/welcome',
+      failureRedirect: '/auth/login'
+    }
+  )
+);
 
 app.get('/auth/login',function(req,res){
   var output =`
@@ -163,6 +215,7 @@ app.get('/auth/login',function(req,res){
       <input type="submit">
     </p>
   </form>
+  <a href="/auth/facebook">facebook</a>
   `;
   res.send(output);
 });
