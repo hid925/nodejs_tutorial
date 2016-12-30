@@ -1,13 +1,20 @@
 var express = require('express');
 var session = require('express-session');
-var FileStore = require('session-file-store')(session);
+var OrientoStore = require('connect-oriento')(session);
 var bodyParser = require('body-parser');
 var bkfd2Password = require("pbkdf2-password");
 var hasher = bkfd2Password();
 var passport = require('passport');
 var LocalStrategy = require('passport-local').Strategy;
 var FacebookStrategy = require('passport-facebook').Strategy;
-
+var OrientDB = require('orientjs');
+var server = OrientDB({
+  host: 'localhost',
+  port: 2424,
+  username: 'root',
+  password: '1111'
+});
+var db = server.use('o2');
 var app = express();
 
 app.use(bodyParser.urlencoded({extended:false}));
@@ -15,7 +22,9 @@ app.use(session({
   secret: '434ADSFIOJSKJC@#!ASDFI',
   resave: false,
   saveUninitialized: true,
-  store:new FileStore()
+  store:new OrientoStore({
+    server: "host=localhost&port=2424&username=root&password=1111&db=o2"
+  })
 }))
 app.use(passport.initialize());
 app.use(passport.session());
@@ -74,12 +83,20 @@ app.post('/auth/register',function(req,res){
       salt:salt,
       displayName:req.body.displayName
     };
-    users.push(user);
-    req.login(user, function(err){
-      req.session.save(function(){
-        res.redirect('/welcome');
-      });
+    var sql = 'INSERT INTO user(authId, username, password, salt, displayName) VALUES(:authId, :username, :password, :salt, :displayName)';
+    db.query(sql,{
+      params:user
+    }).then(function(results){
+      res.redirect('/welcome');
+    },function(error){
+      console.log(error);
+      res.status(500);
     });
+    // req.login(user, function(err){
+    //   req.session.save(function(){
+    //     res.redirect('/welcome');
+    //   });
+    // });
   });
 });
 
@@ -112,34 +129,36 @@ passport.serializeUser(function(user, done) {
 
 passport.deserializeUser(function(id, done) {
   console.log('deserializeUser',id);
-  for(var i=0; i<users.length; i++){
-    var user = users[i];
-    if(user.authId === id){
-      return done(null, user);
+  var sql = "SELECT * FROM user WHERE authId=:authId";
+  db.query(sql,{params:{authId:id}}).then(function(results){
+    if(results.length === 0){
+      done('There is no user');
+    } else {
+      return done(null, results[0]);
     }
-  }
-  done('There is no user.');
+  });
 });
 
 passport.use(new LocalStrategy(
   function(username, password, done){
       var uname = username;
       var pwd = password;
-
-      for(var i=0; i<users.length; i++){
-        var user = users[i];
-        if(uname === user.username){
-          return hasher({password: pwd, salt:user.salt}, function(err, pass, salt, hash){
-            if(hash === user.password){
-              console.log('LocalStrategy',user);
-              done(null, user);
-            }else{
-              done(null, false);
-            }
-          });
+      var sql = 'SELECT * FROM user WHERE authId=:authId';
+      db.query(sql, {params:{authId:'local:'+uname}}).then(function(results){
+//        console.log(results);
+        if(results.length === 0){
+          return done(null,false);
         }
-      }
-      done(null,false);
+        var user=results[0];
+        return hasher({password: pwd, salt:user.salt}, function(err, pass, salt, hash){
+          if(hash === user.password){
+            console.log('LocalStrategy',user);
+            done(null, user);
+          }else{
+            done(null, false);
+          }
+        });
+      })
     }
 ));
 
@@ -153,19 +172,28 @@ passport.use(new FacebookStrategy({
   function(accessToken, refreshToken, profile, done) {
     console.log(profile);
     var authId='facebook:'+profile.id;
-    for(var i=0; i<users.length; i++){
-      var user = users[i];
-      if(user.authId === authId){
-        return done(null, user);
+    var sql = 'SELECT FROM user WHERE authId=:authId';
+    db.query(sql,
+      {params:{authId:authId}}).then(function(results){
+        console.log(results, authId);
+      if(results.length === 0){
+        var newuser={
+          'authId':authId,
+          'displayName':profile.displayName,
+          'email':profile.emails[0].value
+        };
+        var sql = 'INSERT INTO user (authId, displayName, email) VALUES(:authId, :displayName, :email)'
+        db.query(sql, {params:newuser}).then(function(){
+          done(null, newuser);
+        }, function(error){
+          console.log(error);
+          done('error');
+        })
+      }else{
+        return done(null,results[0]);
       }
-    }
-    var newuser={
-      'authId':authId,
-      'displayName':profile.displayName,
-      'email':profile.emails[0].value
-    };
-    users.push(newuser);
-    done(null, newuser);
+    })
+
   //  User.findOrCreate(..., function(err, user) {
   //    if (err) { return done(err); }
   //    done(null, user);
@@ -174,7 +202,8 @@ passport.use(new FacebookStrategy({
 ));
 
 app.post('/auth/login',     //로컬 로그인.
-  passport.authenticate('local',
+  passport.authenticate(
+    'local',
     {
       successRedirect: '/welcome',
       failureRedirect: '/auth/login',
