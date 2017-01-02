@@ -1,0 +1,9 @@
+extends ../layout
+block content
+  article
+    h1= 'Delete? '+topic.title 
+    - rid = encodeURIComponent(topic['@rid']) //오리엔트디비 특문때문에 처리
+      form(action='/topic/'+rid+'/delete' method='post')
+        p
+          input(type='submit' value='yes')
+    a(href='/topic/'+rid) No

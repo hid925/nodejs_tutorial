@@ -1,0 +1,23 @@
+doctype html
+html
+  head
+    meta(charset='utf-8')
+  body
+    ul#account
+      if user
+        li
+          a(href='/auth/logout') Logout, 
+          =user.displayName
+      else
+        li
+          a(href='/auth/login') Login
+        li
+          a(href='/auth/register') Register  
+    h1
+      a(href='/topic') Server Side JavaScript
+    ul
+      each topic in topics
+        li
+          - rid = encodeURIComponent(topic['@rid']) //오리엔트디비 특문때문에 처리
+          a(href='/topic/'+rid)= topic.title
+    block content
